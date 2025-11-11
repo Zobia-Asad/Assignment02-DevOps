@@ -16,7 +16,7 @@ services:
       - "5001:5000"
     volumes:
       - ./server:/app
-    command: sh -c "npm install && node server.js"
+    command: sh -c "npm install && node app.js"
     environment:
       - DATABASE=mongodb://mongo-jenkins:27017/ecommerce
       - PORT=5000

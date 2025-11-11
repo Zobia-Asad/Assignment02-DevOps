@@ -100,8 +100,11 @@ EOF
                     sh '''
                         cd server
                         
-                        # Check which file exists and update docker-compose accordingly
-                        if [ -f "server.js" ]; then
+                        # Check which file exists
+                        if [ -f "app.js" ]; then
+                            echo "✅ Using app.js as entry point"
+                            ENTRY_FILE="app.js"
+                        elif [ -f "server.js" ]; then
                             echo "✅ Using server.js as entry point"
                             ENTRY_FILE="server.js"
                         elif [ -f "index.js" ]; then
@@ -114,7 +117,9 @@ EOF
                         
                         # Update docker-compose command with correct entry point
                         cd ..
+                        sed -i "s/node app.js/node ${ENTRY_FILE}/g" ${COMPOSE_FILE}
                         sed -i "s/node server.js/node ${ENTRY_FILE}/g" ${COMPOSE_FILE}
+                        sed -i "s/node index.js/node ${ENTRY_FILE}/g" ${COMPOSE_FILE}
                         
                         echo "Updated docker-compose backend command to use ${ENTRY_FILE}"
                     '''

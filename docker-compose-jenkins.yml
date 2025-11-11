@@ -32,14 +32,19 @@ services:
       - "3001:3000"
     volumes:
       - ./client:/app
-    command: sh -c "npm install --legacy-peer-deps && WATCHPACK_POLLING=true HOST=0.0.0.0 npm start"
+      - /app/node_modules
+    command: sh -c "npm install --legacy-peer-deps && npm start"
     environment:
       - REACT_APP_API_URL=http://51.20.104.42:5001
+      - HOST=0.0.0.0
       - CHOKIDAR_USEPOLLING=true
-      - WDS_SOCKET_PORT=3001
+      - WATCHPACK_POLLING=true
+      - WDS_SOCKET_PORT=0
     depends_on:
       - backend-jenkins
     restart: unless-stopped
+    stdin_open: true
+    tty: true
 
 volumes:
   mongo_data_jenkins:

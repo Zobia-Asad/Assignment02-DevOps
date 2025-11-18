@@ -1,27 +1,41 @@
 pipeline {
     agent any
-    
+
     environment {
         COMPOSE_FILE = 'docker-compose-jenkins.yml'
         PROJECT_DIR = "${WORKSPACE}"
     }
-    
+
     stages {
         stage('Cleanup - Stop All Jenkins Containers') {
             steps {
                 script {
                     echo '🧹 Stopping and removing all Jenkins containers...'
                     sh '''
+                        # Stop containers using docker-compose
                         cd ${PROJECT_DIR}
-                        docker-compose -f ${COMPOSE_FILE} down --volumes 2>/dev/null || true
+                        docker-compose -f ${COMPOSE_FILE} down -v 2>/dev/null || true
+                        
+                        # Force remove containers if they still exist
                         docker rm -f mongo-jenkins backend-jenkins frontend-jenkins 2>/dev/null || true
+                        
+                        # Remove volumes
                         docker volume rm mern_stack_project_ecommerce_hayroo_mongo_data_jenkins 2>/dev/null || true
+                        docker volume rm $(docker volume ls -q | grep jenkins) 2>/dev/null || true
+                        
+                        # Clean up networks
+                        docker network prune -f
+                        
+                        # Wait a moment for cleanup to complete
+                        sleep 2
+                        
                         echo "✅ All Jenkins containers cleaned up"
+                        docker ps | grep jenkins || echo "No jenkins containers running (as expected)"
                     '''
                 }
             }
         }
-        
+
         stage('Checkout Code from GitHub') {
             steps {
                 echo '📥 Fetching latest code from GitHub repository...'
@@ -33,7 +47,7 @@ pipeline {
                 '''
             }
         }
-        
+
         stage('Verify Project Structure') {
             steps {
                 script {
@@ -41,18 +55,20 @@ pipeline {
                     sh '''
                         echo "=== Root Directory ==="
                         ls -la
-                        
+
                         echo "\n=== Client Directory ==="
                         ls -la client/ 2>/dev/null || echo "❌ Client directory not found"
-                        
+
                         echo "\n=== Server Directory ==="
                         ls -la server/ 2>/dev/null || echo "❌ Server directory not found"
-                        
+
                         echo "\n=== Docker Compose File ==="
                         cat ${COMPOSE_FILE} 2>/dev/null || echo "❌ docker-compose-jenkins.yml not found"
                         
-                        # Check if server.js exists
-                        if [ -f "server/server.js" ]; then
+                        # Check for server entry point
+                        if [ -f "server/app.js" ]; then
+                            echo "✅ app.js found"
+                        elif [ -f "server/server.js" ]; then
                             echo "✅ server.js found"
                         elif [ -f "server/index.js" ]; then
                             echo "✅ index.js found"
@@ -63,7 +79,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Configure Environment Variables') {
             steps {
                 script {
@@ -92,7 +108,7 @@ EOF
                 }
             }
         }
-        
+
         stage('Fix Backend Entry Point') {
             steps {
                 script {
@@ -126,7 +142,7 @@ EOF
                 }
             }
         }
-        
+
         stage('Build and Start Containers') {
             steps {
                 script {
@@ -141,7 +157,7 @@ EOF
                 }
             }
         }
-        
+
         stage('Health Check') {
             steps {
                 script {
@@ -163,7 +179,7 @@ EOF
                 }
             }
         }
-        
+
         stage('Verify Deployment') {
             steps {
                 script {
@@ -182,7 +198,7 @@ EOF
             }
         }
     }
-    
+
     post {
         success {
             echo '''
@@ -195,7 +211,8 @@ EOF
                Backend:  http://51.20.104.42:5001
                MongoDB:  localhost:27018
             
-            💡 Note: Applications may take 1-2 minutes to fully start
+            💡 Note: React app may take 2-3 minutes to fully compile
+                     Backend should be ready immediately
             '''
         }
         failure {
